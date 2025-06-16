@@ -1,0 +1,6 @@
+applicationType: default
+defaultPackage: br.com.estapar
+testFramework: junit
+sourceLanguage: kotlin
+buildTool: gradle_kotlin
+features: [annotation-api, app-name, data, data-jdbc, flyway, gradle, h2, http-client, jdbc-hikari, json-schema, json-schema-validation, junit, kotlin, kotlin-application, kotlin-extension-functions, ksp, logback, management, micronaut-aot, micronaut-build, micronaut-http-validation, netty-server, properties, readme, serialization-jackson, shade, spring, spring-data-jdbc, static-resources, validation]

@@ -1,0 +1,55 @@
+micronaut:
+  application:
+    name: estapar-parking-manager
+  server:
+    port: 3003
+    context-path: /
+  netty:
+    event-loops:
+      default:
+        num-threads: 16
+  http:
+    client:
+      read-timeout: 10s
+      connect-timeout: 10s
+
+# Configuracao do client HTTP para o simulador
+micronaut.http.services:
+  simulator:
+    url: http://localhost:3000
+    read-timeout: 30s
+
+datasources:
+  default:
+    url: jdbc:postgresql://localhost:5432/estapar
+    username: estapar
+    password: estapar123
+    driverClassName: org.postgresql.Driver
+    schema-generate: NONE
+    dialect: POSTGRES
+
+flyway:
+  datasources:
+    default:
+      enabled: true
+      locations:
+        - classpath:db/migration
+      validate-on-migrate: false
+
+jackson:
+  serialization:
+    writeDatesAsTimestamps: false
+  serialization-inclusion: ALWAYS
+
+endpoints:
+  health:
+    enabled: true
+    sensitive: false
+    details-visible: ANONYMOUS
+
+logger:
+  levels:
+    br.com.estapar: DEBUG
+    io.micronaut: INFO
+    io.micronaut.data: DEBUG
+    io.micronaut.http.client: DEBUG

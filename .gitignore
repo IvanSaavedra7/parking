@@ -1,0 +1,39 @@
+.gradle/
+build/
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+### Kotlin
+.kotlin/
+
+### Micronaut
+.micronaut/
+
+### Gradle
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+### Mac
+.DS_Store
+
+### Windows
+thumbs.db
+Desktop.ini
+
+### Logs
+*.log
+
+### Target
+target/
+
+### IDE Specific
+*.swp
+*.bak
+*~
+
+### Docker
+*.env
