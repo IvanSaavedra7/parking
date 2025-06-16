@@ -23,7 +23,8 @@ class WebhookController(
             logService.debug("Webhook recebido: $payload")
 
             // Deserializar para obter o tipo de evento
-            val eventType = objectMapper.readValue(payload, EventTypeHolder::class.java).eventType
+            val eventTypeHolder = objectMapper.readValue(payload, EventTypeHolder::class.java)
+            val eventType = EventType.valueOf(eventTypeHolder.eventType)
 
             // Processar de acordo com o tipo de evento
             return when (eventType) {
@@ -60,14 +61,5 @@ class WebhookController(
             logService.error("Erro ao processar webhook", e)
             return HttpResponse.badRequest(mapOf("status" to "error", "message" to e.message))
         }
-    }
-
-    // Classe auxiliar para extrair o tipo de evento do payload JSON
-    @io.micronaut.core.annotation.Introspected
-    data class EventTypeHolder(
-        val event_type: String
-    ) {
-        val eventType: EventType
-            get() = EventType.valueOf(event_type)
     }
 }

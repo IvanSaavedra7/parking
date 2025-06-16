@@ -6,7 +6,7 @@ import jakarta.inject.Singleton
 import org.slf4j.MDC
 
 @Singleton
-open class LogService {
+class LogService {
     companion object {
         private val logger = LoggerFactory.getLogger(LogService::class.java)
     }

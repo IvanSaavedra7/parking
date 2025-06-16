@@ -7,19 +7,16 @@ import java.time.ZonedDateTime
 
 @Serdeable.Deserializable
 @Introspected
-sealed class WebhookEventDto {
-    abstract val eventType: EventType
-    abstract val licensePlate: String
-}
+data class EventTypeHolder(
+    @field:JsonProperty("event_type")
+    val eventType: String
+)
 
 @Serdeable.Deserializable
 @Introspected
-data class EventTypeHolder(
-    @field:JsonProperty("event_type")
-    val event_type: String
-) {
-    val eventType: EventType
-        get() = EventType.valueOf(event_type)
+sealed class WebhookEventDto {
+    abstract val eventType: EventType
+    abstract val licensePlate: String
 }
 
 @Serdeable.Deserializable

@@ -42,6 +42,7 @@ dependencies {
     implementation("org.springframework:spring-jdbc")
     implementation("org.springframework.boot:spring-boot-starter")
     runtimeOnly("ch.qos.logback:logback-classic")
+    runtimeOnly("org.slf4j:slf4j-api")
     runtimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
     runtimeOnly("com.h2database:h2")
     testImplementation("io.micronaut.jsonschema:micronaut-json-schema-validation")

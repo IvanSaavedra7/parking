@@ -12,6 +12,11 @@ micronaut:
     client:
       read-timeout: 10s
       connect-timeout: 10s
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      date-format: "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"
+
 
 # Configuracao do client HTTP para o simulador
 micronaut.http.services:
@@ -46,10 +51,3 @@ endpoints:
     enabled: true
     sensitive: false
     details-visible: ANONYMOUS
-
-logger:
-  levels:
-    br.com.estapar: DEBUG
-    io.micronaut: INFO
-    io.micronaut.data: DEBUG
-    io.micronaut.http.client: DEBUG
