@@ -16,6 +16,7 @@ import java.math.RoundingMode
 import java.time.Duration
 import java.time.ZonedDateTime
 import jakarta.transaction.Transactional
+import java.time.LocalTime
 
 @Singleton
 open class ParkingTransactionService(
@@ -45,14 +46,35 @@ open class ParkingTransactionService(
         // Obter o veículo (ou criar se não existir)
         val veiculo = veiculoService.obterOuCriarVeiculo(placa)
 
-        // Determinar o setor, pega o primeiro setor disponível
-        val setores = setorRepository.findAll()
-        val setor = setores.firstOrNull() ?: throw IllegalStateException("Nenhum setor configurado no sistema")
+        // Obter todos os setores disponíveis
+        val setores = setorRepository.findAll().toList()
+        if (setores.isEmpty()) {
+            throw IllegalStateException("Nenhum setor configurado no sistema")
+        }
 
-        // Verificar ocupação do setor
-        val setorDisponivel = occupationMonitoringService.verificarDisponibilidadeSetor(setor.id!!)
-        if (!setorDisponivel) {
-            val mensagem = "Entrada negada: setor ${setor.codigoSetor} está com ocupação máxima"
+        // Verificar setores com disponibilidade
+        val horaAtual = ZonedDateTime.now()
+        val setoresDisponiveis = setores
+            .filter { setor ->
+                // Verificar se o estacionamento está aberto neste horário
+                val horaAbertura = LocalTime.parse(setor.horaAbertura.toString())
+                val horaFechamento = LocalTime.parse(setor.horaFechamento.toString())
+                val horaAtualLocal = horaAtual.toLocalTime()
+
+                val estaAberto = if (horaAbertura < horaFechamento) {
+                    horaAtualLocal >= horaAbertura && horaAtualLocal <= horaFechamento
+                } else { // Caso cruze a meia-noite
+                    horaAtualLocal >= horaAbertura || horaAtualLocal <= horaFechamento
+                }
+
+                estaAberto && occupationMonitoringService.verificarDisponibilidadeSetor(setor.id!!)
+            }
+            // escolher crteiro de preferencia (ex: preço ou proximidade)
+            // Se não houver critério específico, podemos ordenar por código para consistência
+            .sortedBy { it.codigoSetor }
+
+        if (setoresDisponiveis.isEmpty()) {
+            val mensagem = "Entrada negada: Todos os setores estão com ocupação máxima ou fechados neste horário"
             logService.warn(mensagem)
 
             // Registrar evento de entrada negada
@@ -61,14 +83,21 @@ open class ParkingTransactionService(
                 tipoEntidade = "VEICULO",
                 entidadeId = veiculo.id!!,
                 descricao = mensagem,
-                metadados = mapOf("placa" to placa, "setor" to setor.codigoSetor)
+                metadados = mapOf(
+                    "placa" to placa,
+                    "hora_tentativa" to horaAtual.toString()
+                )
             )
 
             throw IllegalStateException(mensagem)
         }
 
+        // Pegar o primeiro setor disponível da lista ordenada
+        val setor = setores.firstOrNull() ?: throw IllegalStateException("Nenhum setor encontrado disponivel")
+        logService.info("Direcionando veículo para o setor ${setor.codigoSetor}")
+
         // Obter o fator de preço atual com base na ocupação
-        val ocupacaoAtual = occupationMonitoringService.getOcupacaoAtual(setor.id)
+        val ocupacaoAtual = occupationMonitoringService.getOcupacaoAtual(setor.id!!)
         val fatorPreco = dynamicPricingService.calcularFatorPrecoAtual(setor.id)
 
         // Criar nova transação
@@ -97,7 +126,9 @@ open class ParkingTransactionService(
                 "placa" to placa,
                 "setor" to setor.codigoSetor,
                 "fator_preco" to fatorPreco.toString(),
-                "ocupacao" to "${ocupacaoAtual.percentualOcupacao.movePointRight(2)}%"
+                "ocupacao" to "${ocupacaoAtual.percentualOcupacao.movePointRight(2)}%",
+                "preco_base" to setor.precoBase.toString(),
+                "preco_estimado_hora" to (setor.precoBase * fatorPreco).toString()
             )
         )
 
@@ -125,8 +156,8 @@ open class ParkingTransactionService(
         }
 
         // Identificar a vaga pelas coordenadas
-        val latitude = BigDecimal(evento.lat)
-        val longitude = BigDecimal(evento.lng)
+        val latitude = BigDecimal(evento.lat).setScale(8, RoundingMode.HALF_EVEN)
+        val longitude = BigDecimal(evento.lng).setScale(8, RoundingMode.HALF_EVEN)
 
         val vagaOpt = vagaRepository.findByLatitudeAndLongitude(latitude, longitude)
         if (vagaOpt.isEmpty) {
@@ -189,9 +220,14 @@ open class ParkingTransactionService(
 
         val transacao = transacaoOpt.get()
 
+        logService.info("transacao {}:", transacao)
+
         // Calcular duração e preço final
         val duracao = calcularDuracaoEstacionamento(transacao.horaEntrada, evento.exitTime)
         val precoFinal = calcularPrecoFinal(transacao.precoBase, transacao.fatorPreco, duracao)
+
+        logService.info("duracao {}:", duracao)
+        logService.info("precoFinal {}:", precoFinal)
 
         // Liberar a vaga, se estiver ocupando uma
         if (transacao.vagaId != null) {

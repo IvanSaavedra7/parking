@@ -1,21 +1,25 @@
-// src/main/kotlin/br/com/estapar/parking/service/FaturamentoService.kt
 package br.com.estapar.parking.service
 
 import br.com.estapar.commons.util.LogService
+import br.com.estapar.parking.dto.RevenueResponseDto
 import br.com.estapar.parking.entity.FaturamentoDiario
 import br.com.estapar.parking.entity.TransacaoEstacionamento
 import br.com.estapar.parking.repository.FaturamentoDiarioRepository
+import br.com.estapar.parking.repository.SetorRepository
 import br.com.estapar.parking.repository.TransacaoEstacionamentoRepository
 import jakarta.inject.Singleton
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import jakarta.transaction.Transactional
 
 @Singleton
 open class FaturamentoService(
     private val faturamentoDiarioRepository: FaturamentoDiarioRepository,
     private val transacaoEstacionamentoRepository: TransacaoEstacionamentoRepository,
+    private val setorRepository: SetorRepository,
     private val logService: LogService
 ) {
 
@@ -70,6 +74,24 @@ open class FaturamentoService(
                 logService.debug("Novo registro de faturamento criado: ID ${it.id}, valor: ${it.valor}")
             }
         }
+    }
+
+    fun consultarFaturamento(data: String, codigoSetor: String): RevenueResponseDto {
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+        val dataLocalDate = LocalDate.parse(data, formatter)
+
+        logService.debug("Consultando faturamento para setor $codigoSetor na data $dataLocalDate")
+
+        val setor = setorRepository.findByCodigoSetor(codigoSetor)
+            .orElseThrow { IllegalArgumentException("Setor $codigoSetor não encontrado") }
+
+        val faturamento = calcularFaturamentoDiario(setor.id!!, dataLocalDate)
+
+        return RevenueResponseDto(
+            amount = faturamento,
+            currency = "BRL",
+            timestamp = ZonedDateTime.now()
+        )
     }
 
     fun calcularFaturamentoDiario(setorId: Long, data: LocalDate): BigDecimal {

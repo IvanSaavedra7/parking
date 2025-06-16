@@ -60,7 +60,7 @@ open class OccupationMonitoringService(
         val dadosOcupacao = historico.get()
         val percentualOcupacao = dadosOcupacao.percentualOcupacao
 
-        logService.debug("Verificando disponibilidade do setor $setorId - Ocupação atual: ${percentualOcupacao.movePointRight(2)}%")
+        logService.info("Verificando disponibilidade do setor $setorId - Ocupação atual: ${percentualOcupacao.movePointRight(2)}%")
 
         // Se o percentual de ocupação for 100% ou mais, o setor está cheio
         val setorCheio = percentualOcupacao >= BigDecimal.ONE

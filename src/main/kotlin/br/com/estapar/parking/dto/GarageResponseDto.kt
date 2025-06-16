@@ -12,6 +12,7 @@ data class GarageResponseDto(
 @Serdeable
 data class SectorDto(
     val sector: String,
+    @JsonProperty("base_price")
     val basePrice: Double,
     @JsonProperty("max_capacity")
     val maxCapacity: Int,

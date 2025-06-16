@@ -73,6 +73,7 @@ open class GarageInitializationService(
         garageConfiguration.garage.forEach { setorDto ->
             try {
                 val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+                logService.info("Setor sendo incluido no BD {}:", setorDto)
                 val setor = Setor(
                     codigoSetor = setorDto.sector,
                     precoBase = BigDecimal(setorDto.basePrice).setScale(2, RoundingMode.HALF_EVEN),
