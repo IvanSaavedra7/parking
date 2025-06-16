@@ -361,6 +361,11 @@ O sistema foi projetado e implementado para atender e validar as seguintes regra
 *   **Logging:** Implementação de logging abrangente para diagnóstico.
 *   **Transações de Banco de Dados:** Uso de transações para garantir a atomicidade e consistência dos dados.
 *   **Testes:** (Assumindo que testes unitários e de integração foram implementados para validar o comportamento do sistema).
+   
+### 8.4. Melhorias e pontos de atenção
+
+*   A desconto poderia ser algo parametrizavel no BD para não depender dessa implementação no back-end necessariamente, o valor poderia ser definido quando o carro entrar na garagem ou seja quando o valor for cadastrado no banco de dados 
+*   foi considerado para o calculo do valor a ser pago o tempo que foi permanecido na vaga, ou seja o preço não foi necessariamente um valor fixo
 
 ## 9. Coleção Postman
 
