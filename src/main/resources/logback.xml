@@ -7,16 +7,20 @@
         </encoder>
     </appender>
 
-    <root level="INFO">
+    <root level="WARN">
         <appender-ref ref="STDOUT" />
     </root>
 
-    <!-- Ajuste o package para com.estapar.parking (ou o pacote correto) -->
-    <logger name="com.estapar.parking" level="DEBUG" additivity="false">
+    <logger name="br.com.estapar" level="INFO" additivity="false">
         <appender-ref ref="STDOUT" />
     </logger>
 
-    <logger name="io.micronaut.data" level="TRACE"/>
-    <logger name="io.micronaut.http" level="DEBUG"/>
-    <logger name="io.micronaut.sql" level="DEBUG"/>
+    <logger name="io.micronaut.data.query" level="ERROR" />
+    <logger name="io.micronaut.data" level="WARN" />
+    <logger name="io.micronaut.http" level="INFO" />
+    <logger name="io.micronaut.sql" level="WARN" />
+    <logger name="io.micronaut.context" level="INFO" />
+
+    <logger name="org.hibernate.SQL" level="INFO" />
+    <logger name="org.hibernate.type.descriptor.sql" level="INFO" />
 </configuration>

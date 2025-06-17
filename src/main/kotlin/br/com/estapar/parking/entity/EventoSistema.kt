@@ -1,9 +1,7 @@
 package br.com.estapar.parking.entity
 
-import com.fasterxml.jackson.annotation.JsonRawValue
 import io.micronaut.data.annotation.*
 import io.micronaut.data.model.DataType
-import io.micronaut.serde.annotation.Serdeable
 import java.time.ZonedDateTime
 
 @MappedEntity("eventos_sistema")

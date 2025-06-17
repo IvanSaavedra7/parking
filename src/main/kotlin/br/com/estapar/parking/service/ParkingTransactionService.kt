@@ -1,4 +1,3 @@
-// src/main/kotlin/br/com/estapar/parking/service/ParkingTransactionService.kt
 package br.com.estapar.parking.service
 
 import br.com.estapar.commons.util.LogService
@@ -35,6 +34,8 @@ open class ParkingTransactionService(
     open fun processarEntradaVeiculo(evento: EntryEventDto): TransacaoEstacionamento {
         val placa = evento.licensePlate
         logService.info("Processando entrada do veículo com placa $placa")
+
+        val horaEntrada = evento.entryTime ?: ZonedDateTime.now()
 
         // Verificar se já existe uma transação ativa para este veículo
         val transacaoExistente = transacaoRepository.findActiveByPlaca(placa)
@@ -104,7 +105,7 @@ open class ParkingTransactionService(
         val transacao = TransacaoEstacionamento(
             veiculoId = veiculo.id!!,
             setorId = setor.id,
-            horaEntrada = evento.entryTime,
+            horaEntrada = horaEntrada,
             precoBase = setor.precoBase,
             fatorPreco = fatorPreco,
             status = "ENTROU"
@@ -140,6 +141,13 @@ open class ParkingTransactionService(
         val placa = evento.licensePlate
         logService.info("Processando estacionamento do veículo com placa $placa")
 
+        // Verificar se os campos obrigatórios estão presentes
+        if (evento.lat == null || evento.lng == null) {
+            val mensagem = "Coordenadas de latitude e longitude são obrigatórias para estacionamento"
+            logService.error(mensagem)
+            throw IllegalArgumentException(mensagem)
+        }
+
         // Buscar transação ativa do veículo
         val transacaoOpt = transacaoRepository.findActiveByPlaca(placa)
         if (transacaoOpt.isEmpty) {
@@ -156,8 +164,8 @@ open class ParkingTransactionService(
         }
 
         // Identificar a vaga pelas coordenadas
-        val latitude = BigDecimal(evento.lat).setScale(8, RoundingMode.HALF_EVEN)
-        val longitude = BigDecimal(evento.lng).setScale(8, RoundingMode.HALF_EVEN)
+        val latitude = BigDecimal(evento.lat!!).setScale(8, RoundingMode.HALF_EVEN)
+        val longitude = BigDecimal(evento.lng!!).setScale(8, RoundingMode.HALF_EVEN)
 
         val vagaOpt = vagaRepository.findByLatitudeAndLongitude(latitude, longitude)
         if (vagaOpt.isEmpty) {
@@ -210,6 +218,8 @@ open class ParkingTransactionService(
         val placa = evento.licensePlate
         logService.info("Processando saída do veículo com placa $placa")
 
+        val horaSaida = evento.exitTime ?: ZonedDateTime.now()
+
         // Buscar transação ativa do veículo
         val transacaoOpt = transacaoRepository.findActiveByPlaca(placa)
         if (transacaoOpt.isEmpty) {
@@ -223,7 +233,7 @@ open class ParkingTransactionService(
         logService.info("transacao {}:", transacao)
 
         // Calcular duração e preço final
-        val duracao = calcularDuracaoEstacionamento(transacao.horaEntrada, evento.exitTime)
+        val duracao = calcularDuracaoEstacionamento(transacao.horaEntrada, horaSaida)
         val precoFinal = calcularPrecoFinal(transacao.precoBase, transacao.fatorPreco, duracao)
 
         logService.info("duracao {}:", duracao)
@@ -242,7 +252,7 @@ open class ParkingTransactionService(
 
         // Atualizar transação
         val transacaoAtualizada = transacao.copy(
-            horaSaida = evento.exitTime,
+            horaSaida = horaSaida,
             duracaoMinutos = duracao,
             precoFinal = precoFinal,
             status = "SAIU"

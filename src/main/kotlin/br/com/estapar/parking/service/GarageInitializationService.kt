@@ -85,7 +85,7 @@ open class GarageInitializationService(
 
                 val setorSalvo = setorRepository.save(setor)
                 setoresSalvos[setorDto.sector] = setorSalvo.id!!
-                logService.debug("Setor salvo: ${setorDto.sector} - ID: ${setorSalvo.id}")
+                logService.info("Setor salvo: ${setorDto.sector} - ID: ${setorSalvo.id}")
             } catch (e: Exception) {
                 logService.error("Erro ao processar setor ${setorDto.sector}", e)
                 throw e

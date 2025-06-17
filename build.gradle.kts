@@ -94,5 +94,8 @@ micronaut {
     }
 }
 
+tasks.withType<Jar> {
+    isZip64 = true
+}
 
 

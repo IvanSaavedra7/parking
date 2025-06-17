@@ -305,33 +305,41 @@ Conforme detalhado na seção
 
 Para rodar o projeto localmente, siga os passos abaixo:
 
-1.  **Pré-requisitos:**
+1. **Pré-requisitos:**
     *   Java Development Kit (JDK) 17 ou superior
     *   Docker e Docker Compose
     *   Gradle (gerenciador de build)
 
-2.  **Configuração do Banco de Dados:**
+2. **Configuração do Banco de Dados:**
     *   Certifique-se de ter uma instância do PostgreSQL rodando e acessível.
     *   Crie um banco de dados para o projeto (ex: `estacionamento_db`).
     *   As tabelas serão criadas automaticamente pelo Micronaut/Hibernate ao iniciar a aplicação, com base nas entidades do projeto e no script SQL fornecido.
 
-3.  **Configuração do Simulador:**
+3. **Configuração do Simulador:**
     *   O simulador é um serviço Docker que envia eventos e fornece a configuração da garagem.
     *   Certifique-se de que o simulador esteja rodando e acessível na URL `http://localhost:3003`.
-    *   (Assumindo que o simulador pode ser iniciado via Docker Compose ou similar, instruir o usuário a fazê-lo aqui).
 
-4.  **Configuração da Aplicação:**
+4. **Configuração da Aplicação:**
     *   Clone o repositório do projeto.
     *   Navegue até o diretório raiz do projeto.
     *   Atualize as configurações de conexão com o banco de dados no arquivo `application.yml` (ou `application-dev.yml`) para apontar para sua instância do PostgreSQL.
     *   Certifique-se de que a URL do webhook do simulador esteja configurada corretamente para `http://localhost:3003/webhook`.
 
-5.  **Execução:**
-    *   Para construir e rodar a aplicação, utilize o Gradle:
+5. **Execução:**
+    * Para construir e rodar a aplicação, utilize o Gradle:
         ```bash
         ./gradlew run
         ```
-    *   A aplicação estará disponível em `http://localhost:8080` (porta padrão do Micronaut, se não alterada).
+    * A aplicação estará disponível em `http://localhost:8080` (porta padrão do Micronaut, se não alterada).
+
+6. **Teste via windows:**
+    * Para testar a aplicação via windows foi necessario incluir dentro do projeto um "dockerFile" para poder em parceria com a config presente no "docker-compose.yml" testar a aplicação back-end junto ao simulador, visto ter tido uma limitação ao rodar a aplicação na IDE para ele se comunica com o simulador
+    * Para construir e rodar a aplicação, utilize o Gradle:
+        ```bash
+        ./gradlew build
+        ```
+      Pode se necessario rodar o comando "docker-compose up -d postgres" para o build dar sucesso
+    * após isso executar o comando "docker-compose up --build" para poder executar os containers docker da APi do simulador e do BD para poder testar o funcionamento de ambas as partes integradas
 
 ## 8. Regras Atendidas e Validadas
 
@@ -360,7 +368,7 @@ O sistema foi projetado e implementado para atender e validar as seguintes regra
 *   **Tratamento de Erros:** Cenários excepcionais (veículo sem registro, saída sem entrada, coordenadas inválidas) são tratados adequadamente.
 *   **Logging:** Implementação de logging abrangente para diagnóstico.
 *   **Transações de Banco de Dados:** Uso de transações para garantir a atomicidade e consistência dos dados.
-*   **Testes:** (Assumindo que testes unitários e de integração foram implementados para validar o comportamento do sistema).
+*   **Testes:** precisa implementar
    
 ### 8.4. Melhorias e pontos de atenção
 

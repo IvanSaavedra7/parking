@@ -17,7 +17,32 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - estapar-network
 
+  parking-app:
+    build: .
+    container_name: estapar-parking-app
+    network_mode: "host"  # Usa a rede do host
+    environment:
+      # Agora o simulador está em localhost:3000
+      MICRONAUT_HTTP_SERVICES_SIMULATOR_URL: "http://localhost:3000"
+      DATASOURCES_DEFAULT_URL: "jdbc:postgresql://localhost:5432/estapar"
+      DATASOURCES_DEFAULT_USERNAME: estapar
+      DATASOURCES_DEFAULT_PASSWORD: estapar123
+    depends_on:
+      - postgres
+
+  simulator:
+    image: cfontes0estapar/garage-sim:1.0.0
+    container_name: estapar-simulator
+    network_mode: "host"  # Usa a rede do host
+    depends_on:
+      - parking-app
+
+networks:
+  estapar-network:
+    driver: bridge
 
 volumes:
   postgres-data:
