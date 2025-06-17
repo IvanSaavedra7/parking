@@ -4,7 +4,7 @@ Este projeto implementa um sistema de gestão de estacionamentos robusto e escal
 
 ## 1. Contexto do Projeto
 
-O sistema foi desenvolvido para a Estapar, com o objetivo de automatizar o controle de estacionamentos. Ele opera puramente como um backend, expondo APIs REST para consultas e recebendo webhooks de um simulador para processamento de eventos em tempo real. A arquitetura é baseada em microserviços, utilizando Kotlin e Micronaut, e segue princípios de código limpo e design orientado a domínio.
+O sistema foi desenvolvido com o objetivo de automatizar o controle de estacionamentos. Ele opera puramente como um backend, expondo APIs REST para consultas e recebendo webhooks de um simulador para processamento de eventos em tempo real. A arquitetura é baseada em microserviços, utilizando Kotlin e Micronaut, e segue princípios de código limpo e design orientado a domínio.
 
 ## 2. Diagrama do Banco de Dados
 
@@ -340,7 +340,7 @@ Para rodar o projeto localmente, siga os passos abaixo:
         ```
       Pode se necessario rodar o comando "docker-compose up -d postgres" para o build dar sucesso
     * após isso executar o comando "docker-compose up --build" para poder executar os containers docker da APi do simulador e do BD para poder testar o funcionamento de ambas as partes integradas
-    * obs.: para rodar o run local precisa executar o seguinte comando antes para iniciar o BD "docker-compose up -d postgres" e rodar "docker run -d -p 3000:3000 --add-host=host.docker.internal:host-gateway cfontes0estapar/garage-sim:1.0.0"
+    * obs.: para rodar o run local precisa executar o seguinte comando antes para iniciar o BD "docker-compose up -d postgres" e rodar "docker run -d -p 3000:3000 --add-host=host.docker.internal:host-gateway cfontes0xxxxxxx/garage-sim:1.0.0"
 
 ## 8. Regras Atendidas e Validadas
 
