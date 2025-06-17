@@ -16,6 +16,7 @@ import java.time.Duration
 import java.time.ZonedDateTime
 import jakarta.transaction.Transactional
 import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @Singleton
 open class ParkingTransactionService(
@@ -30,55 +31,85 @@ open class ParkingTransactionService(
     private val logService: LogService
 ) {
 
+    private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+
     @Transactional
     open fun processarEntradaVeiculo(evento: EntryEventDto): TransacaoEstacionamento {
         val placa = evento.licensePlate
-        logService.info("Processando entrada do veículo com placa $placa")
+        val startTime = System.currentTimeMillis()
+        logService.info("ENTRADA: Iniciando processamento de entrada do veiculo placa={}", placa)
 
         val horaEntrada = evento.entryTime ?: ZonedDateTime.now()
+        logService.info("ENTRADA: Horario de entrada registrado={}", horaEntrada.format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
 
-        // Verificar se já existe uma transação ativa para este veículo
+        // Verificar se ja existe uma transacao ativa para este veiculo
+        logService.info("ENTRADA: Verificando se veiculo placa={} ja esta no estacionamento...", placa)
         val transacaoExistente = transacaoRepository.findActiveByPlaca(placa)
         if (transacaoExistente.isPresent) {
-            logService.warn("Veículo com placa $placa já possui uma transação ativa (ID: ${transacaoExistente.get().id})")
-            throw IllegalStateException("Veículo com placa $placa já se encontra no estacionamento")
+            val transacao = transacaoExistente.get()
+            logService.warn("ENTRADA: Veiculo placa={} ja possui transacao ativa id={}, status={}, entrada={}",
+                placa, transacao.id!!, transacao.status, transacao.horaEntrada)
+            throw IllegalStateException("Veiculo com placa $placa ja se encontra no estacionamento")
         }
+        logService.info("ENTRADA: Veiculo placa={} nao possui transacao ativa entao pode entrar", placa)
 
-        // Obter o veículo (ou criar se não existir)
+        // Obter o veiculo (ou criar se nao existir)
         val veiculo = veiculoService.obterOuCriarVeiculo(placa)
 
-        // Obter todos os setores disponíveis
+        // Obter todos os setores disponiveis
+        logService.info("ENTRADA: Buscando setores disponiveis no sistema...")
         val setores = setorRepository.findAll().toList()
         if (setores.isEmpty()) {
+            logService.error("ENTRADA: Nenhum setor configurado no sistema!")
             throw IllegalStateException("Nenhum setor configurado no sistema")
+        }
+
+        logService.info("ENTRADA: Total de setores encontrados: {}", setores.size)
+        setores.forEach { setor ->
+            logService.info("ENTRADA: Setor encontrado: codigo={}, preco_base={}, capacidade={}, horario={}~{}",
+                setor.codigoSetor, setor.precoBase, setor.capacidadeMaxima,
+                setor.horaAbertura, setor.horaFechamento)
         }
 
         // Verificar setores com disponibilidade
         val horaAtual = ZonedDateTime.now()
-        val setoresDisponiveis = setores
-            .filter { setor ->
-                // Verificar se o estacionamento está aberto neste horário
-                val horaAbertura = LocalTime.parse(setor.horaAbertura.toString())
-                val horaFechamento = LocalTime.parse(setor.horaFechamento.toString())
-                val horaAtualLocal = horaAtual.toLocalTime()
+        logService.info("ENTRADA: Hora atual: {}", horaAtual.format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
 
-                val estaAberto = if (horaAbertura < horaFechamento) {
-                    horaAtualLocal >= horaAbertura && horaAtualLocal <= horaFechamento
-                } else { // Caso cruze a meia-noite
-                    horaAtualLocal >= horaAbertura || horaAtualLocal <= horaFechamento
-                }
+        logService.info("ENTRADA: Verificando setores abertos e com disponibilidade...")
+        val setoresDisponiveis = mutableListOf<br.com.estapar.parking.entity.Setor>()
 
-                estaAberto && occupationMonitoringService.verificarDisponibilidadeSetor(setor.id!!)
+        setores.forEach { setor ->
+            // Verificar se o estacionamento esta aberto neste horario
+            val horaAbertura = LocalTime.parse(setor.horaAbertura.toString())
+            val horaFechamento = LocalTime.parse(setor.horaFechamento.toString())
+            val horaAtualLocal = horaAtual.toLocalTime()
+
+            val estaAberto = if (horaAbertura < horaFechamento) {
+                horaAtualLocal >= horaAbertura && horaAtualLocal <= horaFechamento
+            } else { // Caso cruze a meia-noite
+                horaAtualLocal >= horaAbertura || horaAtualLocal <= horaFechamento
             }
-            // escolher crteiro de preferencia (ex: preço ou proximidade)
-            // Se não houver critério específico, podemos ordenar por código para consistência
-            .sortedBy { it.codigoSetor }
 
-        if (setoresDisponiveis.isEmpty()) {
-            val mensagem = "Entrada negada: Todos os setores estão com ocupação máxima ou fechados neste horário"
-            logService.warn(mensagem)
+            val temDisponibilidade = occupationMonitoringService.verificarDisponibilidadeSetor(setor.id!!)
+
+            logService.info("ENTRADA: Analise do setor={}: aberto={}, disponibilidade={}",
+                setor.codigoSetor, estaAberto, temDisponibilidade)
+
+            if (estaAberto && temDisponibilidade) {
+                setoresDisponiveis.add(setor)
+            }
+        }
+
+        // Ordenar setores disponiveis
+        val setoresOrdenados = setoresDisponiveis.sortedBy { it.codigoSetor }
+        logService.info("ENTRADA: Setores disponiveis apos analise: {}", setoresOrdenados.size)
+
+        if (setoresOrdenados.isEmpty()) {
+            val mensagem = "Entrada negada: Todos os setores estao com ocupacao maxima ou fechados neste horario"
+            logService.warn("ENTRADA: {}", mensagem)
 
             // Registrar evento de entrada negada
+            logService.info("ENTRADA: Registrando evento de entrada negada para veiculo id={}", veiculo.id!!)
             eventoSistemaService.registrarEvento(
                 tipoEvento = "ENTRADA_NEGADA",
                 tipoEntidade = "VEICULO",
@@ -93,15 +124,29 @@ open class ParkingTransactionService(
             throw IllegalStateException(mensagem)
         }
 
-        // Pegar o primeiro setor disponível da lista ordenada
-        val setor = setores.firstOrNull() ?: throw IllegalStateException("Nenhum setor encontrado disponivel")
-        logService.info("Direcionando veículo para o setor ${setor.codigoSetor}")
+        // Pegar o primeiro setor disponivel da lista ordenada
+        val setor = setoresOrdenados.firstOrNull()
+            ?: throw IllegalStateException("Nenhum setor encontrado disponivel")
 
-        // Obter o fator de preço atual com base na ocupação
+        logService.info("ENTRADA: Selecionado setor={} para entrada do veiculo placa={}",
+            setor.codigoSetor, placa)
+
         val ocupacaoAtual = occupationMonitoringService.getOcupacaoAtual(setor.id!!)
-        val fatorPreco = dynamicPricingService.calcularFatorPrecoAtual(setor.id)
 
-        // Criar nova transação
+        logService.info("ENTRADA: Ocupacao atual do setor={}: {}% ({}/{} vagas)",
+            setor.codigoSetor,
+            ocupacaoAtual.percentualOcupacao.movePointRight(2),
+            ocupacaoAtual.vagasOcupadas,
+            ocupacaoAtual.totalVagas)
+
+        logService.info("ENTRADA: Calculando fator de preco para setor id={} com ocupacao atual {}%",
+            setor.id, ocupacaoAtual.percentualOcupacao.movePointRight(2))
+        val fatorPreco = dynamicPricingService.calcularFatorPrecoAtual(setor.id)
+        logService.info("ENTRADA: Fator de preco calculado: {}", fatorPreco)
+
+        // Criar nova transacao
+        logService.info("ENTRADA: Criando transacao de estacionamento para veiculo placa={}, setor={}",
+            placa, setor.codigoSetor)
         val transacao = TransacaoEstacionamento(
             veiculoId = veiculo.id!!,
             setorId = setor.id,
@@ -111,18 +156,23 @@ open class ParkingTransactionService(
             status = "ENTROU"
         )
 
+        logService.info("ENTRADA: Salvando transacao no banco de dados...")
         val transacaoSalva = transacaoRepository.save(transacao)
-        logService.info("Transação de entrada criada: ID ${transacaoSalva.id}, veículo $placa, setor ${setor.codigoSetor}")
+        logService.info("ENTRADA: Transacao salva com sucesso: id={}, veiculo={}, setor={}",
+            transacaoSalva.id!!, placa, setor.codigoSetor)
 
-        // Atualizar ocupação do setor
+        // Atualizar ocupacao do setor
+        logService.info("ENTRADA: Atualizando contadores de ocupacao para setor id={}...", setor.id)
         occupationMonitoringService.atualizarOcupacaoSetor(setor.id)
+        logService.info("ENTRADA: Contadores de ocupacao atualizados para setor={}", setor.codigoSetor)
 
         // Registrar evento
+        logService.info("ENTRADA: Registrando evento de sistema para entrada do veiculo id={}", veiculo.id)
         eventoSistemaService.registrarEvento(
             tipoEvento = "ENTRADA",
             tipoEntidade = "VEICULO",
             entidadeId = veiculo.id,
-            descricao = "Veículo entrou no estacionamento",
+            descricao = "Veiculo entrou no estacionamento",
             metadados = mapOf(
                 "placa" to placa,
                 "setor" to setor.codigoSetor,
@@ -133,76 +183,98 @@ open class ParkingTransactionService(
             )
         )
 
+        val endTime = System.currentTimeMillis()
+        logService.info("ENTRADA: Processamento concluido em {}ms para veiculo placa={}",
+            (endTime - startTime), placa)
+
         return transacaoSalva
     }
 
     @Transactional
     open fun processarEstacionamentoVeiculo(evento: ParkedEventDto): TransacaoEstacionamento {
         val placa = evento.licensePlate
-        logService.info("Processando estacionamento do veículo com placa $placa")
+        val startTime = System.currentTimeMillis()
+        logService.info("ESTACIONAMENTO: Iniciando processamento para veiculo placa={}", placa)
 
-        // Verificar se os campos obrigatórios estão presentes
+        // Verificar se os campos obrigatorios estao presentes
         if (evento.lat == null || evento.lng == null) {
-            val mensagem = "Coordenadas de latitude e longitude são obrigatórias para estacionamento"
-            logService.error(mensagem)
+            val mensagem = "Coordenadas de latitude e longitude sao obrigatorias para estacionamento"
+            logService.error("ESTACIONAMENTO: ${mensagem}")
             throw IllegalArgumentException(mensagem)
         }
 
-        // Buscar transação ativa do veículo
+        // Buscar transacao ativa do veiculo
+        logService.info("ESTACIONAMENTO: Buscando transacao ativa para veiculo placa={}", placa)
         val transacaoOpt = transacaoRepository.findActiveByPlaca(placa)
         if (transacaoOpt.isEmpty) {
-            val mensagem = "Veículo com placa $placa não possui entrada registrada"
-            logService.warn(mensagem)
+            val mensagem = "Veiculo com placa $placa nao possui entrada registrada"
+            logService.warn("ESTACIONAMENTO: {}", mensagem)
             throw IllegalStateException(mensagem)
         }
 
         val transacao = transacaoOpt.get()
+        logService.info("ESTACIONAMENTO: Transacao ativa encontrada id={}, status={}, setor id={}",
+            transacao.id!!, transacao.status, transacao.setorId)
+
         if (transacao.status == "ESTACIONADO") {
-            val mensagem = "Veículo com placa $placa já está estacionado"
-            logService.warn(mensagem)
+            val mensagem = "Veiculo com placa $placa ja esta estacionado"
+            logService.warn("ESTACIONAMENTO: {}", mensagem)
             throw IllegalStateException(mensagem)
         }
 
         // Identificar a vaga pelas coordenadas
-        val latitude = BigDecimal(evento.lat!!).setScale(8, RoundingMode.HALF_EVEN)
-        val longitude = BigDecimal(evento.lng!!).setScale(8, RoundingMode.HALF_EVEN)
+        logService.info("ESTACIONAMENTO: Convertendo coordenadas: lat={}, lng={}", evento.lat, evento.lng)
+        val latitude = BigDecimal(evento.lat).setScale(8, RoundingMode.HALF_EVEN)
+        val longitude = BigDecimal(evento.lng).setScale(8, RoundingMode.HALF_EVEN)
+        logService.info("ESTACIONAMENTO: Buscando vaga com coordenadas lat={}, lng={}", latitude, longitude)
 
         val vagaOpt = vagaRepository.findByLatitudeAndLongitude(latitude, longitude)
         if (vagaOpt.isEmpty) {
-            val mensagem = "Vaga com coordenadas (${evento.lat}, ${evento.lng}) não encontrada"
-            logService.warn(mensagem)
+            val mensagem = "Vaga com coordenadas (${evento.lat}, ${evento.lng}) nao encontrada"
+            logService.warn("ESTACIONAMENTO: {}", mensagem)
             throw IllegalStateException(mensagem)
         }
 
         val vaga = vagaOpt.get()
+        logService.info("ESTACIONAMENTO: Vaga encontrada id={}, setor id={}, status={}",
+            vaga.id!!, vaga.setorId, vaga.status)
 
-        // Verificar se a vaga está disponível
+        // Verificar se a vaga esta disponivel
         if (vaga.status != "DISPONIVEL") {
-            val mensagem = "Vaga ${vaga.id} não está disponível (status: ${vaga.status})"
-            logService.warn(mensagem)
+            val mensagem = "Vaga ${vaga.id} nao esta disponivel (status: ${vaga.status})"
+            logService.warn("ESTACIONAMENTO: {}", mensagem)
             throw IllegalStateException(mensagem)
         }
 
         // Atualizar status da vaga
+        logService.info("ESTACIONAMENTO: Atualizando status da vaga id={} para OCUPADA", vaga.id)
         val vagaAtualizada = vaga.copy(status = "OCUPADA")
         vagaRepository.update(vagaAtualizada)
+        logService.info("ESTACIONAMENTO: Status da vaga id={} atualizado para OCUPADA", vaga.id)
 
-        // Atualizar transação
+        // Atualizar transacao
+        logService.info("ESTACIONAMENTO: Atualizando transacao id={} para incluir vaga id={}",
+            transacao.id!!, vaga.id)
+        val horaEstacionamento = ZonedDateTime.now()
         val transacaoAtualizada = transacao.copy(
             vagaId = vaga.id,
-            horaEstacionamento = ZonedDateTime.now(),
+            horaEstacionamento = horaEstacionamento,
             status = "ESTACIONADO"
         )
 
+        logService.info("ESTACIONAMENTO: Salvando transacao atualizada no banco de dados...")
         val transacaoSalva = transacaoRepository.update(transacaoAtualizada)
-        logService.info("Veículo $placa estacionado na vaga ${vaga.id} - Transação atualizada: ${transacaoSalva.id}")
+        logService.info("ESTACIONAMENTO: Transacao atualizada: id={}, status={}, hora_estacionamento={}",
+            transacaoSalva.id!!, transacaoSalva.status,
+            transacaoSalva.horaEstacionamento?.format(DateTimeFormatter.ISO_ZONED_DATE_TIME)!!)
 
         // Registrar evento
+        logService.info("ESTACIONAMENTO: Registrando evento de sistema...")
         eventoSistemaService.registrarEvento(
             tipoEvento = "ESTACIONAMENTO",
             tipoEntidade = "VEICULO",
             entidadeId = transacao.veiculoId,
-            descricao = "Veículo estacionado",
+            descricao = "Veiculo estacionado",
             metadados = mapOf(
                 "vaga_id" to vaga.id.toString(),
                 "lat" to evento.lat.toString(),
@@ -210,47 +282,68 @@ open class ParkingTransactionService(
             )
         )
 
+        val endTime = System.currentTimeMillis()
+        logService.info("ESTACIONAMENTO: Processamento concluido em {}ms para veiculo placa={}",
+            (endTime - startTime), placa)
+
         return transacaoSalva
     }
 
     @Transactional
     open fun processarSaidaVeiculo(evento: ExitEventDto): TransacaoEstacionamento {
         val placa = evento.licensePlate
-        logService.info("Processando saída do veículo com placa $placa")
+        val startTime = System.currentTimeMillis()
+        logService.info("SAIDA: Iniciando processamento de saida para veiculo placa={}", placa)
 
         val horaSaida = evento.exitTime ?: ZonedDateTime.now()
+        logService.info("SAIDA: Horario de saida registrado={}",
+            horaSaida.format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
 
-        // Buscar transação ativa do veículo
+        // Buscar transacao ativa do veiculo
+        logService.info("SAIDA: Buscando transacao ativa para veiculo placa={}", placa)
         val transacaoOpt = transacaoRepository.findActiveByPlaca(placa)
         if (transacaoOpt.isEmpty) {
-            val mensagem = "Veículo com placa $placa não possui entrada registrada"
-            logService.warn(mensagem)
+            val mensagem = "Veiculo com placa $placa nao possui entrada registrada"
+            logService.warn("SAIDA: {}", mensagem)
             throw IllegalStateException(mensagem)
         }
 
         val transacao = transacaoOpt.get()
+        logService.info("SAIDA: Transacao ativa encontrada id={}, status={}, entrada={}",
+            transacao.id!!, transacao.status,
+            transacao.horaEntrada.format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
 
-        logService.info("transacao {}:", transacao)
-
-        // Calcular duração e preço final
+        // Calcular duracao e preco final
+        logService.info("SAIDA: Calculando duracao do estacionamento: entrada={}, saida={}",
+            transacao.horaEntrada.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
+            horaSaida.format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
         val duracao = calcularDuracaoEstacionamento(transacao.horaEntrada, horaSaida)
-        val precoFinal = calcularPrecoFinal(transacao.precoBase, transacao.fatorPreco, duracao)
+        logService.info("SAIDA: Duracao calculada: {} minutos", duracao)
 
-        logService.info("duracao {}:", duracao)
-        logService.info("precoFinal {}:", precoFinal)
+        logService.info("SAIDA: Calculando preco final: base={}, fator={}, duracao={}min",
+            transacao.precoBase, transacao.fatorPreco, duracao)
+        val precoFinal = calcularPrecoFinal(transacao.precoBase, transacao.fatorPreco, duracao)
+        logService.info("SAIDA: Preco final calculado: {}", precoFinal)
 
         // Liberar a vaga, se estiver ocupando uma
         if (transacao.vagaId != null) {
+            logService.info("SAIDA: Verificando vaga id={} para liberacao", transacao.vagaId)
             val vagaOpt = vagaRepository.findById(transacao.vagaId)
             if (vagaOpt.isPresent) {
                 val vaga = vagaOpt.get()
+                logService.info("SAIDA: Atualizando status da vaga id={} para DISPONIVEL", vaga.id!!)
                 val vagaAtualizada = vaga.copy(status = "DISPONIVEL")
                 vagaRepository.update(vagaAtualizada)
-                logService.debug("Vaga ${vaga.id} liberada")
+                logService.info("SAIDA: Vaga id={} liberada com sucesso", vaga.id!!)
+            } else {
+                logService.warn("SAIDA: Vaga id={} nao encontrada para liberacao", transacao.vagaId)
             }
+        } else {
+            logService.info("SAIDA: Veiculo nao estava associado a uma vaga especifica")
         }
 
-        // Atualizar transação
+        // Atualizar transacao
+        logService.info("SAIDA: Atualizando transacao id={} com dados de saida", transacao.id)
         val transacaoAtualizada = transacao.copy(
             horaSaida = horaSaida,
             duracaoMinutos = duracao,
@@ -258,42 +351,67 @@ open class ParkingTransactionService(
             status = "SAIU"
         )
 
+        logService.info("SAIDA: Salvando transacao finalizada no banco de dados...")
         val transacaoSalva = transacaoRepository.update(transacaoAtualizada)
-        logService.info("Veículo $placa saiu do estacionamento - Transação finalizada: ${transacaoSalva.id}, valor: $precoFinal")
+        logService.info("SAIDA: Transacao finalizada: id={}, valor={}, duracao={}min",
+            transacaoSalva.id!!, precoFinal, duracao)
 
-        // Atualizar ocupação do setor
+        // Atualizar ocupacao do setor
         occupationMonitoringService.atualizarOcupacaoSetor(transacao.setorId)
 
         // Atualizar faturamento
+        logService.info("SAIDA: Atualizando faturamento diario para setor id={}...", transacao.setorId)
         faturamentoService.atualizarFaturamentoDiario(transacao.setorId, transacaoSalva)
+        logService.info("SAIDA: Faturamento diario atualizado com sucesso")
 
         // Registrar evento
+        logService.info("SAIDA: Registrando evento de sistema...")
         eventoSistemaService.registrarEvento(
             tipoEvento = "SAIDA",
             tipoEntidade = "VEICULO",
             entidadeId = transacao.veiculoId,
-            descricao = "Veículo saiu do estacionamento",
+            descricao = "Veiculo saiu do estacionamento",
             metadados = mapOf(
                 "duracao_minutos" to duracao.toString(),
                 "preco_final" to precoFinal.toString()
             )
         )
 
+        val endTime = System.currentTimeMillis()
+        logService.info("SAIDA: Processamento concluido em {}ms para veiculo placa={}",
+            (endTime - startTime), placa)
+
         return transacaoSalva
     }
 
     private fun calcularDuracaoEstacionamento(entrada: ZonedDateTime, saida: ZonedDateTime): Int {
+        logService.debug("Calculando duracao entre {} e {}",
+            entrada.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
+            saida.format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
+
         val duracao = Duration.between(entrada, saida)
-        return duracao.toMinutes().toInt()
+        val minutos = duracao.toMinutes().toInt()
+
+        logService.debug("Duracao calculada: {} minutos", minutos)
+        return minutos
     }
 
     private fun calcularPrecoFinal(precoBase: BigDecimal, fatorPreco: BigDecimal, duracaoMinutos: Int): BigDecimal {
-        // Preço final = preço base por hora * fator de preço * (duração em minutos / 60)
-        val duracaoEmHoras = BigDecimal(duracaoMinutos).divide(BigDecimal(60), 2, RoundingMode.HALF_EVEN)
+        // Preco final = preco base por hora * fator de preco * (duracao em minutos / 60)
+        logService.debug("Calculando preco final: base={}, fator={}, duracao={}min",
+            precoBase, fatorPreco, duracaoMinutos)
 
-        return precoBase
-            .multiply(fatorPreco)
+        val duracaoEmHoras = BigDecimal(duracaoMinutos).divide(BigDecimal(60), 2, RoundingMode.HALF_EVEN)
+        logService.debug("Duracao em horas: {}", duracaoEmHoras)
+
+        val precoIntermediario = precoBase.multiply(fatorPreco)
+        logService.debug("Preco base ajustado pelo fator: {}", precoIntermediario)
+
+        val precoFinal = precoIntermediario
             .multiply(duracaoEmHoras)
             .setScale(2, RoundingMode.HALF_EVEN)
+
+        logService.debug("Preco final calculado: {}", precoFinal)
+        return precoFinal
     }
 }

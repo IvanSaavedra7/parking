@@ -41,10 +41,10 @@ data class EntryEventDto(
 data class ParkedEventDto(
     // Campos específicos do evento de estacionamento
     @field:JsonProperty("lat")
-    var lat: Double? = null,
+    var lat: Double ,
 
     @field:JsonProperty("lng")
-    var lng: Double? = null
+    var lng: Double
 ) : BaseWebhookEventDto()
 
 @Serdeable.Deserializable

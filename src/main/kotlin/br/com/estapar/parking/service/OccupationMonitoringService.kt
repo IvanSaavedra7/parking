@@ -21,7 +21,7 @@ open class OccupationMonitoringService(
 
     @Transactional
     open fun atualizarOcupacaoSetor(setorId: Long): HistoricoOcupacaoSetor {
-        logService.debug("Atualizando ocupação do setor $setorId")
+        logService.info("Atualizando contadores de ocupação para setor id=${setorId}...")
 
         val vagasOcupadas = transacaoEstacionamentoRepository.countActiveBySetorId(setorId)
         val totalVagas = vagaRepository.countBySetorId(setorId)
@@ -35,7 +35,8 @@ open class OccupationMonitoringService(
 
         val fatorPreco = dynamicPricingService.calcularFatorPrecoAtual(setorId)
 
-        logService.debug("Ocupação atual: $vagasOcupadas/$totalVagas vagas (${percentualOcupacao.movePointRight(2)}%)")
+        logService.info("Ocupação atual: $vagasOcupadas/$totalVagas vagas (${percentualOcupacao.movePointRight(2)}%)")
+        logService.info("Contadores de ocupação atualizados com sucesso")
 
         val historico = HistoricoOcupacaoSetor(
             setorId = setorId,
@@ -53,14 +54,13 @@ open class OccupationMonitoringService(
         val historico = historicoOcupacaoSetorRepository.buscarUltimaOcupacaoPorSetor(setorId)
 
         if (historico.isEmpty) {
-            logService.warn("Histórico de ocupação não encontrado para o setor $setorId")
+            logService.warn("Historico de ocupacao nao encontrado para o setor $setorId")
             return true
         }
 
         val dadosOcupacao = historico.get()
         val percentualOcupacao = dadosOcupacao.percentualOcupacao
 
-        logService.info("Verificando disponibilidade do setor $setorId - Ocupação atual: ${percentualOcupacao.movePointRight(2)}%")
 
         // Se o percentual de ocupação for 100% ou mais, o setor está cheio
         val setorCheio = percentualOcupacao >= BigDecimal.ONE
@@ -73,10 +73,13 @@ open class OccupationMonitoringService(
     }
 
     fun getOcupacaoAtual(setorId: Long): HistoricoOcupacaoSetor {
+
+        logService.info("Calculando ocupacao atual para setor id={}", setorId)
+
         val historico = historicoOcupacaoSetorRepository.buscarUltimaOcupacaoPorSetor(setorId)
 
         if (historico.isEmpty) {
-            throw IllegalStateException("Histórico de ocupação não encontrado para o setor $setorId")
+            throw IllegalStateException("Historico de ocupacao nao encontrado para o setor $setorId")
         }
 
         return historico.get()

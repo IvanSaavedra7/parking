@@ -65,6 +65,7 @@ allOpen {
 
 application {
     mainClass = "br.com.estapar.ApplicationKt"
+    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8")
 }
 java {
     sourceCompatibility = JavaVersion.toVersion("17")

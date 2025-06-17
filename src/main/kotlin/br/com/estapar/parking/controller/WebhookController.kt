@@ -43,7 +43,7 @@ class WebhookController(
                 "ENTRY" -> {
                     // Simplesmente deserializa o payload JSON original para o tipo específico
                     val event = objectMapper.readValue(payload, EntryEventDto::class.java)
-                    logService.info("Processando evento ENTRY para placa ${event.licensePlate}")
+                    logService.info("Processando evento ENTRY para placa : {}", event)
 
                     val transaction = parkingTransactionService.processarEntradaVeiculo(event)
                     HttpResponse.ok(mapOf("status" to "success", "message" to "Entrada registrada com sucesso", "transaction_id" to transaction.id))
@@ -51,7 +51,7 @@ class WebhookController(
 
                 "PARKED" -> {
                     val event = objectMapper.readValue(payload, ParkedEventDto::class.java)
-                    logService.info("Processando evento PARKED para placa ${event.licensePlate}")
+                    logService.info("Processando evento PARKED para placa: {}", event)
 
                     val transaction = parkingTransactionService.processarEstacionamentoVeiculo(event)
                     HttpResponse.ok(mapOf("status" to "success", "message" to "Estacionamento registrado com sucesso", "transaction_id" to transaction.id))
@@ -59,7 +59,7 @@ class WebhookController(
 
                 "EXIT" -> {
                     val event = objectMapper.readValue(payload, ExitEventDto::class.java)
-                    logService.info("Processando evento EXIT para placa ${event.licensePlate}")
+                    logService.info("Processando evento EXIT para placa : {}", event)
 
                     val transaction = parkingTransactionService.processarSaidaVeiculo(event)
                     HttpResponse.ok(mapOf(
@@ -76,7 +76,7 @@ class WebhookController(
                 }
             }
         } catch (e: Exception) {
-            logService.error("Erro ao processar webhook", e)
+            logService.error("Erro ao processar webhook: ${e.message}", e)
             logService.error("Payload problemático: $payload")
             return HttpResponse.badRequest(mapOf("status" to "error", "message" to e.message))
         }

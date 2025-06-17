@@ -25,13 +25,15 @@ open class FaturamentoService(
 
     @Transactional
     open fun atualizarFaturamentoDiario(setorId: Long, transacao: TransacaoEstacionamento) {
+        logService.info("Atualizando faturamento diario para setor id=${setorId}...")
+
         if (transacao.horaSaida == null || transacao.precoFinal == null) {
             logService.warn("Tentativa de atualizar faturamento com transação incompleta: ${transacao.id}")
             return
         }
 
         val dataFaturamento = transacao.horaSaida!!.toLocalDate()
-        logService.debug("Atualizando faturamento diário para setor $setorId na data $dataFaturamento")
+        logService.info("Atualizando faturamento diario para setor $setorId na data $dataFaturamento")
 
         val faturamentoExistente = faturamentoDiarioRepository.findBySetorIdAndData(setorId, dataFaturamento)
 
@@ -59,7 +61,7 @@ open class FaturamentoService(
             )
 
             faturamentoDiarioRepository.update(faturamentoAtualizado).also {
-                logService.debug("Faturamento atualizado: ID ${it.id}, valor total: ${it.valor}")
+                logService.info("Faturamento atualizado: ID ${it.id}, valor total: ${it.valor}")
             }
         } else {
             val novoFaturamento = FaturamentoDiario(
@@ -71,7 +73,7 @@ open class FaturamentoService(
             )
 
             faturamentoDiarioRepository.save(novoFaturamento).also {
-                logService.debug("Novo registro de faturamento criado: ID ${it.id}, valor: ${it.valor}")
+                logService.info("Novo registro de faturamento criado: ID ${it.id}, valor: ${it.valor}")
             }
         }
     }
@@ -80,7 +82,7 @@ open class FaturamentoService(
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
         val dataLocalDate = LocalDate.parse(data, formatter)
 
-        logService.debug("Consultando faturamento para setor $codigoSetor na data $dataLocalDate")
+        logService.info("Consultando faturamento para setor $codigoSetor na data $dataLocalDate")
 
         val setor = setorRepository.findByCodigoSetor(codigoSetor)
             .orElseThrow { IllegalArgumentException("Setor $codigoSetor não encontrado") }
@@ -95,7 +97,7 @@ open class FaturamentoService(
     }
 
     fun calcularFaturamentoDiario(setorId: Long, data: LocalDate): BigDecimal {
-        logService.debug("Calculando faturamento para setor $setorId na data $data")
+        logService.info("Calculando faturamento para setor $setorId na data $data")
 
         val faturamentoOptional = faturamentoDiarioRepository.findBySetorIdAndData(setorId, data)
 
@@ -104,14 +106,14 @@ open class FaturamentoService(
         }
 
         // Se não existir registro no faturamento diário, calcula a partir das transações
-        logService.debug("Nenhum registro de faturamento encontrado. Calculando a partir das transações.")
+        logService.info("Nenhum registro de faturamento encontrado. Calculando a partir das transações.")
         val transacoes = transacaoEstacionamentoRepository.findAllCompletedBySetorIdAndDate(setorId, data)
 
         val total = transacoes.fold(BigDecimal.ZERO) { acc, transacao ->
             transacao.precoFinal?.let { acc.add(it) } ?: acc
         }
 
-        logService.debug("Faturamento calculado: $total")
+        logService.info("Faturamento calculado: $total")
         return total
     }
 }

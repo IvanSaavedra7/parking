@@ -4,6 +4,7 @@ micronaut:
   server:
     port: 3003
     context-path: /
+    charset: UTF-8
   netty:
     event-loops:
       default:

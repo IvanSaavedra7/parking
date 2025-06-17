@@ -61,7 +61,7 @@ open class GarageInitializationService(
             setorRepository.truncateTable()
             logService.info("Dados anteriores da garagem removidos com sucesso")
         } catch (e: Exception) {
-            logService.error("Erro ao limpar dados anteriores", e)
+            logService.info("Erro ao limpar dados anteriores", e)
             throw e
         }
     }

@@ -340,6 +340,7 @@ Para rodar o projeto localmente, siga os passos abaixo:
         ```
       Pode se necessario rodar o comando "docker-compose up -d postgres" para o build dar sucesso
     * após isso executar o comando "docker-compose up --build" para poder executar os containers docker da APi do simulador e do BD para poder testar o funcionamento de ambas as partes integradas
+    * obs.: para rodar o run local precisa executar o seguinte comando antes para iniciar o BD "docker-compose up -d postgres" e rodar "docker run -d -p 3000:3000 --add-host=host.docker.internal:host-gateway cfontes0estapar/garage-sim:1.0.0"
 
 ## 8. Regras Atendidas e Validadas
 
